@@ -1,0 +1,93 @@
+spring:
+  application:
+    name: payment-service
+  profiles:
+    active: dev
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/paymentdb
+    username: paymentuser
+    password: paymentpass
+    pool:
+      enabled: true
+      initial-size: 5
+      max-size: 10
+      max-idle-time: 30m
+  datasource:
+    url: jdbc:postgresql://localhost:5432/paymentdb
+    username: paymentuser
+    password: paymentpass
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 5
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          lob:
+            non_contextual_creation: true
+
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      externalService:
+        registerHealthIndicator: true
+        failureRateThreshold: 50
+        minimumNumberOfCalls: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 10
+        slidingWindowType: COUNT_BASED
+        recordExceptions:
+          - com.pragma.payment.domain.exception.ExternalServiceException
+          - com.pragma.payment.domain.exception.NetworkException
+        ignoreExceptions:
+          - java.lang.IllegalStateException
+  retry:
+    instances:
+      externalService:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - com.pragma.payment.domain.exception.ExternalServiceException
+          - com.pragma.payment.domain.exception.NetworkException
+        ignoreExceptions:
+          - java.lang.IllegalStateException
+  timelimiter:
+    instances:
+      externalService:
+        timeoutDuration: 2s
+
+logging:
+  level:
+    com.pragma.payment: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    io.github.resilience4j: DEBUG
